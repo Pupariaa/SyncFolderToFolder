@@ -2,6 +2,7 @@ const chokidar = require('chokidar');
 const fs = require('fs').promises;
 const path = require('path');
 const Metrics = require('./Metrics/Modules/Metrics');
+const { eventNames } = require('process');
 
 const localDir = 'C:/Users/USER/Documents/Dev/'; //The source folder
 const remoteDir = 'C:/Users/USER/Documents/Dev/'; //The destination folder (the one that will be sync)
@@ -18,30 +19,34 @@ watcher
 
 async function handleFileChange(eventType, filePath) {
   const ts = metrics.getDate();
-  console.log(`[ ${ts} ]: New Task`);
   metrics.TimerStart('event');
-
+  var eventResult = "" 
   const relativePath = path.relative(localDir, filePath);
   const remotePath = path.join(remoteDir, relativePath);
 
   try {
     switch (eventType) {
+
       case 'add':
       case 'change':
-        logCommit('Edit/Create Locale File', filePath, 'Copied', remotePath);
+        logCommit('> Edit/Create locale file from', filePath);
         await copyFile(filePath, remotePath);
+        eventResult = "> Copied or modified remote file to"
         break;
       case 'unlink':
-        logCommit('Delete Locale File', filePath, 'File Deleted', remotePath);
+        logCommit('> Delete locale file from', filePath);
         await deleteFile(remotePath);
+        eventResult = "> Deleted remote file to"
         break;
       case 'addDir':
-        logCommit('Edit/Create Locale Path', filePath, 'Dir Created', remotePath);
+        logCommit('> Edit/Create locale dir from', filePath);
         await createDir(remotePath);
+        eventResult = "> Created remote dir to"
         break;
       case 'unlinkDir':
-        logCommit('Delete Locale Path', filePath, 'Dir Deleted', remotePath);
+        logCommit('> Delete locale dir from', filePath);
         await deleteDir(remotePath);
+        eventResult = "> Deleted remote dir to"
         break;
       default:
         console.log(`[ ${ts} ]: Unmanaged Event: ${eventType}`);
@@ -49,8 +54,7 @@ async function handleFileChange(eventType, filePath) {
   } catch (error) {
     handleError(error);
   } finally {
-    const elapsedTime = metrics.TimerStop('event');
-    logFinishedTask(elapsedTime);
+    logOutput(eventResult, remotePath)
   }
 }
 
@@ -70,18 +74,17 @@ async function deleteDir(dirPath) {
   await fs.rm(dirPath, { recursive: true });
 }
 
-function logCommit(commitAction, sourcePath, resultAction, destinationPath) {
+function logCommit(commitAction, sourcePath) {
   const ts = metrics.getDate();
-  console.log(`[ ${ts} ]: Commit from: ${commitAction} "${sourcePath}"`);
-  console.log(`[ ${ts} ]: Commit to: ${resultAction}: ${destinationPath}`);
+  console.log(`[ ${ts} ]: Commit ${commitAction} "${sourcePath}"`);
+}
+function logOutput(resultAction, destinationPath) {
+  const ts = metrics.getDate();
+  const elapsedTime = metrics.TimerStop('event');
+  console.log(`[ ${ts} ]: ${resultAction} " ${destinationPath} in ${elapsedTime || 0} ms`);
 }
 
 function handleError(error) {
   const ts = metrics.getDate();
   console.error(`[ ${ts} ]: Error: ${error.message}`);
-}
-
-function logFinishedTask(elapsedTime) {
-  const ts = metrics.getDate();
-  console.log(`[ ${ts} ]: Finished Task in ${elapsedTime} ms`);
 }
